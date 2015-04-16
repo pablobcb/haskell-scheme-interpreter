@@ -31,8 +31,8 @@ spaces = skipMany1 space
 
 escaped :: Parser Char
 escaped = do char '\\' 
-             x <- oneOf "\\\"nrt" 
-             return $ case x of 
+             c <- oneOf ['\\', '\"', 'n', 'r', 't'] 
+             return $ case c of 
                '\\' -> x
                '"'  -> x
                'n'  -> '\n'
@@ -44,20 +44,12 @@ parseString :: Parser Value
 parseString = do
                 char '"'
                 s <- many $ escaped <|> (noneOf ['\"', '\\']) <|> symbol
-                --s <- many $ noneOf ['"']
                 char '"'
                 return $ String s
 
 
 parseAtom :: Parser Value
-parseAtom = do 
-              first <-  letter <|> symbol
-              rest <- many (letter <|> digit <|> symbol)
-              let atom = first : rest :: [Char]
-
-              return $ case atom of 
-                         _    -> Atom atom
-
+parseAtom = many (letter <|> digit <|> symbol) >>= return . Atom
 
 parseBool :: Parser Value
 parseBool = do
@@ -80,8 +72,8 @@ parseNumber = liftM (Number . read) (many1 digit)
 
 
 parseExpr :: Parser Value
-parseExpr = parseAtom
-         <|> parseString
+parseExpr = parseString
+         <|> parseAtom
          <|> parseNumber
 		 <|> parseBool
 
