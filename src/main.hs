@@ -21,7 +21,7 @@ data Value = Atom String
 -- generaters a parser that checks if a
 -- character exists in !#$%&|*+-/:<=>?@^_~
 symbol :: Parser Char
-symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
+symbol = oneOf "!$%&|*+-/:<=>?@^_~"
 
 
 -- generaters a parser that checks if next
@@ -29,27 +29,53 @@ symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
 spaces :: Parser ()
 spaces = skipMany1 space
 
+escaped :: Parser Char
+escaped = do char '\\' 
+             x <- oneOf "\\\"nrt" 
+             return $ case x of 
+               '\\' -> x
+               '"'  -> x
+               'n'  -> '\n'
+               'r'  -> '\r'
+               't'  -> '\t'
+
 
 parseString :: Parser Value
 parseString = do
                 char '"'
-                x <- many (noneOf "\"")
+                s <- many $ escaped <|> (noneOf ['\"', '\\']) <|> symbol
+                --s <- many $ noneOf ['"']
                 char '"'
-                return (String x)
+                return $ String s
 
 
 parseAtom :: Parser Value
 parseAtom = do 
-              first <- letter <|> symbol 
+              first <-  letter <|> symbol
               rest <- many (letter <|> digit <|> symbol)
               let atom = first : rest :: [Char]
+
               return $ case atom of 
-                         "#t" -> Bool True
-                         "#f" -> Bool False
                          _    -> Atom atom
 
 
+parseBool :: Parser Value
+parseBool = do
+			  char '#'
+			  (char 't' >> t) <|> (char 'f' >> f)
+	where
+		t = return $ Bool True
+		f = return $ Bool False
+
 parseNumber :: Parser Value
+-- exercise Parsing.1.1
+-- parseNumber = do
+-- 				strNumber <- many1 digit
+-- 				(return . Number . read) strNumber
+
+-- exercise Parsing.1.2
+-- parseNumber = (many1 digit) >>= (return . Number . read)
+
 parseNumber = liftM (Number . read) (many1 digit)
 
 
@@ -57,6 +83,7 @@ parseExpr :: Parser Value
 parseExpr = parseAtom
          <|> parseString
          <|> parseNumber
+		 <|> parseBool
 
 readExpr :: String -> String
 readExpr expr = case parsedExpr of
