@@ -5,9 +5,9 @@ import Control.Monad
 
 main :: IO ()
 main = do
-	args <- getArgs
-	putStrLn (readExpr (args !! 0))
-
+	let values = ["\"10\"", "420", "isso é uma \\n \"string\"", "#f", "while()"]
+	mapM (putStrLn . readExpr ) values
+	return ()
 
 data Value = Atom String
            | List [Value]
@@ -73,9 +73,9 @@ parseNumber = liftM (Number . read) (many1 digit)
 
 parseExpr :: Parser Value
 parseExpr = parseString
-         <|> parseAtom
          <|> parseNumber
 		 <|> parseBool
+         <|> parseAtom
 
 readExpr :: String -> String
 readExpr expr = case parsedExpr of
