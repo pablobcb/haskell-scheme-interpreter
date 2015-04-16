@@ -33,8 +33,8 @@ escaped :: Parser Char
 escaped = do char '\\' 
              c <- oneOf ['\\', '\"', 'n', 'r', 't'] 
              return $ case c of 
-               '\\' -> x
-               '"'  -> x
+               '\\' -> c
+               '"'  -> c
                'n'  -> '\n'
                'r'  -> '\r'
                't'  -> '\t'
