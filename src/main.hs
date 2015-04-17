@@ -1,11 +1,17 @@
 module Main where
-import Text.ParserCombinators.Parsec hiding (spaces)
+
+import Control.Monad (liftM)
+import Data.Array (Array (..), listArray)
+import Data.Ratio (Rational (..), (%))
+import Data.Complex (Complex (..))
+import Numeric (readOct, readHex)
 import System.Environment
-import Control.Monad
+import Text.ParserCombinators.Parsec hiding (spaces)
+
 
 main :: IO ()
 main = do
-	let values = ["\"10\"", "420", "isso é uma \\n \"string\"", "#f", "while()"]
+	let values = ["\"10\"", "42.10", "42", "\"iso \\n \"string\"", "'\n'", "' '", "@asd"]
 	mapM (putStrLn . readExpr ) values
 	return ()
 
@@ -15,6 +21,8 @@ data Value = Atom String
            | Number Integer
            | String String
            | Bool Bool 
+           | Character Char
+           | Float Double
            deriving Show
 
 
@@ -48,8 +56,22 @@ parseString = do
                 return $ String s
 
 
+--parseAtom :: Parser Value
+--parseAtom = many (letter <|> digit <|> symbol) >>= return . Atom
 parseAtom :: Parser Value
-parseAtom = many (letter <|> digit <|> symbol) >>= return . Atom
+parseAtom = do first <- letter <|> symbol
+               rest <- many (letter <|> digit <|> symbol)
+               (return . Atom) (first:rest)
+
+parseChar :: Parser Value
+parseChar = do 
+			char '\''
+			c <- anyChar
+			char '\''
+			return $ Character c
+
+
+
 
 parseBool :: Parser Value
 parseBool = do
@@ -59,22 +81,62 @@ parseBool = do
 		t = return $ Bool True
 		f = return $ Bool False
 
+parseFloat :: Parser Value
+parseFloat = do 
+	integerPart <- many1 digit
+	char '.'
+	decimalPart <- many1 digit
+	let float = read (integerPart ++ ['.'] ++ decimalPart) :: Double
+	return $ Float float
+
 parseNumber :: Parser Value
--- exercise Parsing.1.1
--- parseNumber = do
--- 				strNumber <- many1 digit
--- 				(return . Number . read) strNumber
+parseNumber = parsePlainNumber <|> parseRadixNumber
 
--- exercise Parsing.1.2
--- parseNumber = (many1 digit) >>= (return . Number . read)
+parsePlainNumber :: Parser Value
+parsePlainNumber = many1 digit >>= return . Number . read
 
-parseNumber = liftM (Number . read) (many1 digit)
+parseRadixNumber :: Parser Value
+parseRadixNumber = char '#' >> 
+                   (
+                        parseDecimal 
+                        <|> parseBinary
+                        <|> parseOctal
+                        <|> parseHex
+                   )
 
+parseDecimal :: Parser Value
+parseDecimal = do char 'd'
+                  n <- many1 digit
+                  (return . Number . read) n
+
+parseBinary :: Parser Value
+parseBinary = do char 'b'
+                 n <- many $ oneOf "01"
+                 (return . Number . bin2int) n
+
+bin2int :: String -> Integer
+bin2int s = sum $ map (\(i,x) -> i*(2^x)) $ zip [0..] $ map p (reverse s)
+          where p '0' = 0
+                p '1' = 1
+
+parseOctal :: Parser Value
+parseOctal = do char 'o'
+                n <- many $ oneOf "01234567"
+                (return . Number . (readWith readOct)) n
+
+parseHex :: Parser Value
+parseHex = do char 'x'
+              n <- many $ oneOf "0123456789abcdefABCDEF"
+              (return . Number . (readWith readHex)) n
+
+readWith f s = fst $ f s !! 0 
 
 parseExpr :: Parser Value
-parseExpr = parseString
-         <|> parseNumber
-		 <|> parseBool
+parseExpr = parseAtom
+		 <|> parseString
+         <|> try parseChar
+         <|> try parseFloat
+         <|> try parseNumber 
          <|> parseAtom
 
 readExpr :: String -> String
