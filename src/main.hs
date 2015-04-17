@@ -11,9 +11,9 @@ import Text.ParserCombinators.Parsec hiding (spaces)
 
 main :: IO ()
 main = do
-	let values = ["\"10\"", "42.10", "42", "\"iso \\n \"string\"", "'\n'", "' '", "@asd"]
-	mapM (putStrLn . readExpr ) values
-	return ()
+    let values = ["1/20", "42.10", "42", "\"iso \\n \"string\"", "'\n'", "' '", "@asd", "32+2i"]
+    mapM (putStrLn . readExpr ) values
+    return ()
 
 data Value = Atom String
            | List [Value]
@@ -22,7 +22,9 @@ data Value = Atom String
            | String String
            | Bool Bool 
            | Character Char
+           | Ratio Rational
            | Float Double
+           | Complex (Complex Double)
            deriving Show
 
 
@@ -65,29 +67,29 @@ parseAtom = do first <- letter <|> symbol
 
 parseChar :: Parser Value
 parseChar = do 
-			char '\''
-			c <- anyChar
-			char '\''
-			return $ Character c
+            char '\''
+            c <- anyChar
+            char '\''
+            return $ Character c
 
 
 
 
 parseBool :: Parser Value
 parseBool = do
-			  char '#'
-			  (char 't' >> t) <|> (char 'f' >> f)
-	where
-		t = return $ Bool True
-		f = return $ Bool False
+              char '#'
+              (char 't' >> t) <|> (char 'f' >> f)
+    where
+        t = return $ Bool True
+        f = return $ Bool False
 
 parseFloat :: Parser Value
 parseFloat = do 
-	integerPart <- many1 digit
-	char '.'
-	decimalPart <- many1 digit
-	let float = read (integerPart ++ ['.'] ++ decimalPart) :: Double
-	return $ Float float
+    integerPart <- many1 digit
+    char '.'
+    decimalPart <- many1 digit
+    let float = read (integerPart ++ ['.'] ++ decimalPart) :: Double
+    return $ Float float
 
 parseNumber :: Parser Value
 parseNumber = parsePlainNumber <|> parseRadixNumber
@@ -96,7 +98,7 @@ parsePlainNumber :: Parser Value
 parsePlainNumber = many1 digit >>= return . Number . read
 
 parseRadixNumber :: Parser Value
-parseRadixNumber = char '#' >> 
+parseRadixNumber = char '#' >>
                    (
                         parseDecimal 
                         <|> parseBinary
@@ -124,24 +126,50 @@ parseOctal = do char 'o'
                 n <- many $ oneOf "01234567"
                 (return . Number . (readWith readOct)) n
 
+
 parseHex :: Parser Value
 parseHex = do char 'x'
               n <- many $ oneOf "0123456789abcdefABCDEF"
               (return . Number . (readWith readHex)) n
 
+
 readWith f s = fst $ f s !! 0 
+
+parseRatio :: Parser Value
+parseRatio = do num <- fmap read $ many1 digit
+                char '/'
+                denom <- fmap read $ many1 digit
+                (return . Ratio) (num % denom)
+
+
+
+toDouble :: Value -> Double
+toDouble(Float f) = f
+toDouble(Number n) = fromIntegral n
+
+parseComplex :: Parser Value
+parseComplex = do r <- fmap toDouble (try parseFloat <|> parsePlainNumber)
+                  char '+'
+                  i <- fmap toDouble (try parseFloat <|> parsePlainNumber)
+                  char 'i'
+                  (return . Complex) (r :+ i)
+               where toDouble (Float x) = x
+                     toDouble (Number x) = fromIntegral x
+
 
 parseExpr :: Parser Value
 parseExpr = parseAtom
-		 <|> parseString
+         <|> parseString
          <|> try parseChar
          <|> try parseFloat
-         <|> try parseNumber 
-         <|> parseAtom
+         <|> try parseRatio
+         <|> try parseComplex
+         <|> try parseNumber
+
 
 readExpr :: String -> String
 readExpr expr = case parsedExpr of
-    Left err -> "No match: " ++ show err
-    Right val -> "Found value: " ++ show val
+    Left err -> "No Match: " ++ show err
+    Right val -> "Found Value: " ++ show val
     where parsedExpr = parse parseExpr "scheme" expr
   
