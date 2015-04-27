@@ -8,12 +8,20 @@ import Numeric (readOct, readHex)
 import System.Environment
 import Text.ParserCombinators.Parsec hiding (spaces)
 
-
+-- quoted, complex numbers
 main :: IO ()
 main = do
-	let values = ["\"10\"", "42.10", "42", "\"iso \\n \"string\"", "'\n'", "' '", "@asd"]
-	mapM (putStrLn . readExpr ) values
-	return ()
+    let string    = ["\"10\"", "\"iso \\n \"string\""]
+    let number    = ["42.10", "42", "#b101010", "#d234", "#o12345", "#x8F"]
+    let character = ["'\n'", "' '", "'a'"]
+    let boolean   = ["#t", "#f"]
+    let atom      = ["@asd" , "$sddd"]
+    let list      = ["(a list)", "(a (nested) list then)", "(a (dotted . list) test)"]
+    let quoted    = []
+
+    mapM (putStrLn . readExpr ) (string ++ number ++ boolean ++ character ++ atom ++ list ++ quoted)
+
+    return ()
 
 data Value = Atom String
            | List [Value]
@@ -23,6 +31,7 @@ data Value = Atom String
            | Bool Bool 
            | Character Char
            | Float Double
+           | Complex (Complex)
            deriving Show
 
 
@@ -71,29 +80,29 @@ parseChar = do
 			return $ Character c
 
 
-
-
 parseBool :: Parser Value
 parseBool = do
-			  char '#'
-			  (char 't' >> t) <|> (char 'f' >> f)
-	where
-		t = return $ Bool True
-		f = return $ Bool False
+        char '#'
+        (char 't' >> t) <|> (char 'f' >> f)
+  where
+    t = return $ Bool True
+    f = return $ Bool False
 
 parseFloat :: Parser Value
 parseFloat = do 
-	integerPart <- many1 digit
-	char '.'
-	decimalPart <- many1 digit
-	let float = read (integerPart ++ ['.'] ++ decimalPart) :: Double
-	return $ Float float
+    integerPart <- many1 digit
+    char '.'
+    decimalPart <- many1 digit
+    let float = read (integerPart ++ ['.'] ++ decimalPart) :: Double
+    return $ Float float
 
 parseNumber :: Parser Value
 parseNumber = parsePlainNumber <|> parseRadixNumber
 
+
 parsePlainNumber :: Parser Value
 parsePlainNumber = many1 digit >>= return . Number . read
+
 
 parseRadixNumber :: Parser Value
 parseRadixNumber = char '#' >> 
@@ -104,44 +113,88 @@ parseRadixNumber = char '#' >>
                         <|> parseHex
                    )
 
+
 parseDecimal :: Parser Value
 parseDecimal = do char 'd'
                   n <- many1 digit
                   (return . Number . read) n
+
 
 parseBinary :: Parser Value
 parseBinary = do char 'b'
                  n <- many $ oneOf "01"
                  (return . Number . bin2int) n
 
+
 bin2int :: String -> Integer
 bin2int s = sum $ map (\(i,x) -> i*(2^x)) $ zip [0..] $ map p (reverse s)
           where p '0' = 0
                 p '1' = 1
+
+
+readWith f s = fst $ f s !! 0 
+
 
 parseOctal :: Parser Value
 parseOctal = do char 'o'
                 n <- many $ oneOf "01234567"
                 (return . Number . (readWith readOct)) n
 
+
 parseHex :: Parser Value
 parseHex = do char 'x'
               n <- many $ oneOf "0123456789abcdefABCDEF"
               (return . Number . (readWith readHex)) n
 
-readWith f s = fst $ f s !! 0 
+parseComplex :: Parser LispVal
+parseComplex = do r <- fmap toDouble (try parseFloat <|> parsePlainNumber)
+                  char '+'
+                  i <- fmap toDouble (try parseFloat <|> parsePlainNumber)
+                  char 'i'
+                  (return . Complex) (r :+ i)
+               where toDouble (Float x) = x
+                     toDouble (Number x) = fromIntegral x
+
 
 parseExpr :: Parser Value
 parseExpr = parseAtom
-		 <|> parseString
+         <|> parseString
          <|> try parseChar
+         <|> try parseComplex
          <|> try parseFloat
          <|> try parseNumber 
-         <|> parseAtom
+         <|> parseQuoted
+         <|> parseBool
+         <|> parseCollection
+
+
+parseCollection :: Parser Value
+parseCollection = do
+    char '('
+    x <- try parseList <|> parseDottedList
+    char ')'
+    return x
+
+parseList :: Parser Value
+parseList = liftM List $ sepBy parseExpr spaces
+
+
+parseDottedList :: Parser Value
+parseDottedList = do
+    head <- endBy parseExpr spaces
+    tail <- char '.' >> spaces >> parseExpr
+    return $ DottedList head tail
+
+
+parseQuoted :: Parser Value
+parseQuoted = do
+    char '\''
+    x <- parseExpr
+    return $ List [Atom "quote", x]
+
 
 readExpr :: String -> String
 readExpr expr = case parsedExpr of
-    Left err -> "No match: " ++ show err
-    Right val -> "Found value: " ++ show val
+    Left err -> "{no match}: " ++ show err
+    Right val -> "{value}: " ++ show val
     where parsedExpr = parse parseExpr "scheme" expr
-  
