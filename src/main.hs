@@ -16,10 +16,11 @@ main = do
     let character = ["'\n'", "' '", "'a'"]
     let boolean   = ["#t", "#f"]
     let atom      = ["@asd" , "$sddd"]
+    let complex   = ["3+4i"]
     let list      = ["(a list)", "(a (nested) list then)", "(a (dotted . list) test)"]
     let quoted    = []
 
-    mapM (putStrLn . readExpr ) (string ++ number ++ boolean ++ character ++ atom ++ list ++ quoted)
+    mapM (putStrLn . readExpr ) (string ++ number ++ complex ++ boolean ++ character ++ atom ++ list ++ quoted)
 
     return ()
 
@@ -31,7 +32,7 @@ data Value = Atom String
            | Bool Bool 
            | Character Char
            | Float Double
-           | Complex (Complex)
+           | Complex (Complex Double)
            deriving Show
 
 
@@ -146,7 +147,7 @@ parseHex = do char 'x'
               n <- many $ oneOf "0123456789abcdefABCDEF"
               (return . Number . (readWith readHex)) n
 
-parseComplex :: Parser LispVal
+parseComplex :: Parser Value
 parseComplex = do r <- fmap toDouble (try parseFloat <|> parsePlainNumber)
                   char '+'
                   i <- fmap toDouble (try parseFloat <|> parsePlainNumber)
