@@ -8,19 +8,19 @@ import Numeric (readOct, readHex)
 import System.Environment
 import Text.ParserCombinators.Parsec hiding (spaces)
 
--- quoted, complex numbers
+-- quoted, negative complex numbers
 main :: IO ()
 main = do
-    let string    = ["\"10\"", "\"iso \\n \"string\""]
-    let number    = ["42.10", "42", "#b101010", "#d234", "#o12345", "#x8F"]
-    let character = ["'\n'", "' '", "'a'"]
-    let boolean   = ["#t", "#f"]
-    let atom      = ["@asd" , "$sddd"]
-    let complex   = ["3+4i"]
-    let list      = ["(a list)", "(a (nested) list then)", "(a (dotted . list) test)"]
-    let quoted    = []
+    let values = [ "\"10\"", "\"iso \\n \"string\""
+                 , "42.10", "42", "#b101010", "#d234", "#o12345", "#x8F"
+                 , "'\n'", "' '", "'a'"
+                 , "#t", "#f"
+                 , "@symbol1" , "$ymbol2"
+                 , "3+4i", "-2+2i"
+                 , "(a list)", "(a (nested) list then)", "(a (dotted . list) test)"
+                 ]
 
-    mapM (putStrLn . readExpr ) (string ++ number ++ complex ++ boolean ++ character ++ atom ++ list ++ quoted)
+    mapM (putStrLn . readExpr ) values
 
     return ()
 
@@ -160,8 +160,8 @@ parseComplex = do r <- fmap toDouble (try parseFloat <|> parsePlainNumber)
 parseExpr :: Parser Value
 parseExpr = parseAtom
          <|> parseString
-         <|> try parseChar
          <|> try parseComplex
+         <|> try parseChar
          <|> try parseFloat
          <|> try parseNumber 
          <|> parseQuoted
