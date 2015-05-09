@@ -1,23 +1,45 @@
 module Main where
 
+import Text.ParserCombinators.Parsec hiding (spaces)
 import Control.Monad (liftM)
-import Data.Array (Array (..), listArray)
 import Data.Ratio (Rational (..), (%))
 import Data.Complex (Complex (..))
 import Numeric (readOct, readHex)
+import Data.Array (Array (..), listArray)
 import System.Environment
-import Text.ParserCombinators.Parsec hiding (spaces)
 
-
+--TODO: negative complex numbers
 main :: IO ()
 main = do
-    let values = ["1/20", "42.10", "42", "\"iso \\n \"string\"", "'\n'", "' '", "@asd", "32+2i"]
+    let values = [ "\"10\"", "\"iso \\n \"string\""
+                 , "42.10", "42", "#b101010", "#d234", "#o12345", "#x8F"
+                 , "'\n'", "' '", "'a'"
+                 , "#t", "#f"
+                 , "@symbol1" , "$ymbol2"
+                 , "3+4i", "-2+2i"
+                 , "(a list)", "(a (nested) list)", "(a (dotted . list) test)"
+                 , "'\"joeo\"", "'123"
+                 , "#(0 (2 5 1) \"Ana\")"
+                 ]
+
     mapM (putStrLn . readExpr ) values
+
     return ()
 
+parseExpr :: Parser Value
+parseExpr = parseAtom
+         <|> parseString
+         <|> try parseComplex
+         <|> try parseChar
+         <|> try parseFloat
+         <|> try parseNumber 
+         <|> parseQuoted
+         <|> parseList
+         <|> parseVector
+         <|> parseBool
+
+-- Scheme Types
 data Value = Atom String
-           | List [Value]
-           | DottedList [Value] Value
            | Number Integer
            | String String
            | Bool Bool 
@@ -25,6 +47,9 @@ data Value = Atom String
            | Ratio Rational
            | Float Double
            | Complex (Complex Double)
+           | List [Value]
+           | DottedList [Value] Value
+           | Vector (Array Int Value)
            deriving Show
 
 
@@ -73,8 +98,6 @@ parseChar = do
             return $ Character c
 
 
-
-
 parseBool :: Parser Value
 parseBool = do
               char '#'
@@ -94,8 +117,10 @@ parseFloat = do
 parseNumber :: Parser Value
 parseNumber = parsePlainNumber <|> parseRadixNumber
 
+
 parsePlainNumber :: Parser Value
 parsePlainNumber = many1 digit >>= return . Number . read
+
 
 parseRadixNumber :: Parser Value
 parseRadixNumber = char '#' >>
@@ -106,20 +131,27 @@ parseRadixNumber = char '#' >>
                         <|> parseHex
                    )
 
+
 parseDecimal :: Parser Value
 parseDecimal = do char 'd'
                   n <- many1 digit
                   (return . Number . read) n
+
 
 parseBinary :: Parser Value
 parseBinary = do char 'b'
                  n <- many $ oneOf "01"
                  (return . Number . bin2int) n
 
+
 bin2int :: String -> Integer
 bin2int s = sum $ map (\(i,x) -> i*(2^x)) $ zip [0..] $ map p (reverse s)
           where p '0' = 0
                 p '1' = 1
+
+
+readWith f s = fst $ f s !! 0 
+
 
 parseOctal :: Parser Value
 parseOctal = do char 'o'
@@ -132,8 +164,6 @@ parseHex = do char 'x'
               n <- many $ oneOf "0123456789abcdefABCDEF"
               (return . Number . (readWith readHex)) n
 
-
-readWith f s = fst $ f s !! 0 
 
 parseRatio :: Parser Value
 parseRatio = do num <- fmap read $ many1 digit
@@ -157,19 +187,41 @@ parseComplex = do r <- fmap toDouble (try parseFloat <|> parsePlainNumber)
                      toDouble (Number x) = fromIntegral x
 
 
-parseExpr :: Parser Value
-parseExpr = parseAtom
-         <|> parseString
-         <|> try parseChar
-         <|> try parseFloat
-         <|> try parseRatio
-         <|> try parseComplex
-         <|> try parseNumber
+parseQuoted :: Parser Value
+parseQuoted = do
+    char '\''
+    x <- parseExpr
+    return $ List [Atom "quote", x]
+
+
+parseList :: Parser Value
+parseList = do
+    char '('
+    x <- try parseList' <|> try parseDottedList
+    char ')'
+    return x
+
+parseList' :: Parser Value
+parseList' = liftM List $ sepBy parseExpr spaces
+
+
+parseDottedList :: Parser Value
+parseDottedList = do
+    head <- endBy parseExpr spaces
+    tail <- char '.' >> spaces >> parseExpr
+    return $ DottedList head tail
+
+
+parseVector :: Parser Value
+parseVector = do string "#("
+                 members <- sepBy parseExpr spaces
+                 char ')'
+                 let range = (0, length members - 1)
+                 return $ Vector $ listArray range members
 
 
 readExpr :: String -> String
 readExpr expr = case parsedExpr of
-    Left err -> "No Match: " ++ show err
-    Right val -> "Found Value: " ++ show val
+    Left err -> "{no match}: " ++ show err
+    Right val -> "{value}: " ++ show val
     where parsedExpr = parse parseExpr "scheme" expr
-  
