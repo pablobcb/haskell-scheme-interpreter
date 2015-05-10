@@ -1,7 +1,7 @@
 module Main where
 
 import System.Environment
-import Scheme.Parser
+import Parser
 
 --TODO: negative complex numbers
 main :: IO ()
@@ -15,9 +15,10 @@ main = do
                  , "(a list)", "(a (nested) list)", "(a (dotted . list) test)"
                  , "'\"joeo\"", "'123"
                  , "#(0 (2 5 1) \"Ana\")"
+                 , "#[Error]: "
                  ]
 
-    mapM (putStrLn . readExpr ) values
+    mapM (putStrLn . show . parseExpr) values
 
     return ()
 

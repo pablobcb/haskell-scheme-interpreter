@@ -1,6 +1,6 @@
 module Scheme.Parser
 ( parseExpr
-, readExpr
+, Value (..)
 ) where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
@@ -10,17 +10,17 @@ import Data.Complex (Complex (..))
 import Numeric (readOct, readHex)
 import Data.Array (Array (..), listArray)
 
-parseExpr :: Parser Value
-parseExpr = parseAtom
-         <|> parseString
-         <|> try parseComplex
-         <|> try parseChar
-         <|> try parseFloat
-         <|> try parseNumber 
-         <|> parseQuoted
-         <|> parseList
-         <|> try parseVector
-         <|> parseBool
+parseExpr' :: Parser Value
+parseExpr' = parseAtom
+          <|> parseString
+          <|> try parseComplex
+          <|> try parseChar
+          <|> try parseFloat
+          <|> try parseNumber 
+          <|> parseQuoted
+          <|> parseList
+          <|> try parseVector
+          <|> parseBool
 
 -- Scheme Types
 data Value = Atom String
@@ -34,7 +34,8 @@ data Value = Atom String
            | List [Value]
            | DottedList [Value] Value
            | Vector (Array Int Value)
-           deriving Show
+           | Error String
+           deriving(Show, Eq)
 
 
 -- generaters a parser that checks if a
@@ -174,7 +175,7 @@ parseComplex = do r <- fmap toDouble (try parseFloat <|> parsePlainNumber)
 parseQuoted :: Parser Value
 parseQuoted = do
     char '\''
-    x <- parseExpr
+    x <- parseExpr'
     return $ List [Atom "quote", x]
 
 
@@ -186,26 +187,26 @@ parseList = do
     return x
 
 parseList' :: Parser Value
-parseList' = liftM List $ sepBy parseExpr spaces
+parseList' = liftM List $ sepBy parseExpr' spaces
 
 
 parseDottedList :: Parser Value
 parseDottedList = do
-    head <- endBy parseExpr spaces
-    tail <- char '.' >> spaces >> parseExpr
+    head <- endBy parseExpr' spaces
+    tail <- char '.' >> spaces >> parseExpr'
     return $ DottedList head tail
 
 
 parseVector :: Parser Value
 parseVector = do string "#("
-                 members <- sepBy parseExpr spaces
+                 members <- sepBy parseExpr' spaces
                  char ')'
                  let range = (0, length members - 1)
                  return $ Vector $ listArray range members
 
 
-readExpr :: String -> String
-readExpr expr = case parsedExpr of
-    Left err -> "{no match}: " ++ show err
-    Right val -> "{value}: " ++ show val
-    where parsedExpr = parse parseExpr "scheme" expr
+parseExpr :: String -> Value
+parseExpr expr = case parsedExpr of
+    Left err -> Error $ show err
+    Right val -> val
+    where parsedExpr = parse parseExpr' "scheme" expr
