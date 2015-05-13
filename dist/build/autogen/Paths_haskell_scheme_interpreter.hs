@@ -17,10 +17,10 @@ version :: Version
 version = Version {versionBranch = [0,1,0,0], versionTags = []}
 bindir, libdir, datadir, libexecdir :: FilePath
 
-bindir     = "/home/l/.cabal/bin"
-libdir     = "/home/l/.cabal/lib/haskell-scheme-interpreter-0.1.0.0/ghc-7.6.3"
-datadir    = "/home/l/.cabal/share/haskell-scheme-interpreter-0.1.0.0"
-libexecdir = "/home/l/.cabal/libexec"
+bindir     = "/home/pablobcb/.cabal/bin"
+libdir     = "/home/pablobcb/.cabal/lib/haskell-scheme-interpreter-0.1.0.0/ghc-7.6.3"
+datadir    = "/home/pablobcb/.cabal/share/haskell-scheme-interpreter-0.1.0.0"
+libexecdir = "/home/pablobcb/.cabal/libexec"
 
 getBinDir, getLibDir, getDataDir, getLibexecDir :: IO FilePath
 getBinDir = catchIO (getEnv "haskell_scheme_interpreter_bindir") (\_ -> return bindir)

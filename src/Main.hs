@@ -1,7 +1,7 @@
 module Main where
 
 import System.Environment
-import Parser
+import Scheme.Parser
 
 --TODO: negative complex numbers
 main :: IO ()
@@ -21,4 +21,3 @@ main = do
     mapM (putStrLn . show . parseExpr) values
 
     return ()
-
