@@ -1,0 +1,12 @@
+Test suite spec: RUNNING...
+
+Scheme.Parser
+  when applying Parser.parseExpr
+    with Numbers as arguments, it returns
+      (Number 42)::Value given "42"
+      (Float 42.42)::Value given "42.42"
+
+Finished in 0.0003 seconds
+2 examples, 0 failures
+Test suite spec: PASS
+Test suite logged to: dist/test/haskell-scheme-interpreter-0.1.0.0-spec.log
