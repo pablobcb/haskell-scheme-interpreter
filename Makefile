@@ -10,6 +10,9 @@ configure:
 clean:
 	cabal clean
 
-t:
-	cabal test --show-details=always
+run:
+	runhaskell -isrc -itest src/Main.hs
+
+tst:
+	cabal build && cabal test --show-details=always
 
